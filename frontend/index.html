@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <!-- Style -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- d3.js and dialogflow messenger -->
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <script src="https://www.gstatic.com/dialogflow-console/fast/messenger/bootstrap.js?v=1"></script>
+    <!-- Interpolation -->
+    <script src="javascript/lib/everpolate.browserified.min.js"></script>
+
+    <title>Transient Behavior Dashboard</title>
+    <link rel="shortcut icon" type="image/png" href="favicon.png">
+</head>
+
+<body>
+    <nav class="navbar navbar-dark bg-dark justify-content-between">
+        <span class="navbar-brand mb-0 h1">Transient Behavior Dashboard</span>
+        <form class="form-inline">            
+            <label for="scenarios" id="scenarios-label" class="col-form-label nav-form-label">Scenario:</label>
+            <select name="scenarios" id="scenarios" class="form-control">
+                <option value="1">Task 1</option>
+                <option value="2">Task 2</option>
+            </select>
+        </form>
+    </nav>
+
+    <div class="container-fluid">
+        <!-- Architecture visualization -->
+        <div class="viz-container">
+            <div class="row">
+                <div class="col">
+                    <div id="arch_viz"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service data visualization -->
+        <div class="viz-container data-viz-container" id="service-viz-container">
+            <div class="row">
+                <div class="col-auto">
+                    <h3>Transient Behavior</h3>
+                </div>
+            </div>
+            <div class="row justify-content-between">
+                <form class="form-inline">
+                    <div class="form-group col-auto">
+                        <label for="endpoints" class="col-form-label">Endpoint:</label>
+                        <select name="endpoints" id="endpoints" class="form-control"></select>
+                    </div>
+                    <div class="form-group col-auto" id="causes-select-container">
+                        <label for="causes" class="col-form-label">Cause:</label>
+                        <select name="causes" id="causes" class="form-control">
+                            <option value="failure">Failure</option>
+                            <option value="deployment">Deployment</option>
+                            <option value="load-balancing">Load</option>
+                        </select>
+                    </div>
+                </form>
+
+                <div class="col-auto">
+                    <!-- <button type="button" data-toggle="modal" data-target="#add-specification-modal" class="btn btn-primary btn-edit" id="editSpecBtn">Edit specification</button> -->
+                    <button type="button" onclick="deleteSpecification()" class="btn btn-primary btn-delete" id ="deleteSpecBtn">Delete specification</button>
+                    <button type="button" data-toggle="modal" data-target="#add-specification-modal" class="btn btn-primary btn-add" id="addSpecBtn">Add specification</button>
+                    <button type="button" onclick="toggleSpecification()" class="btn btn-primary btn-show"
+                        id="specification-toggle">Show specification</button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div id="data_viz"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transient loos visualization -->
+        <div class="viz-container data-viz-container" id="loss-viz-container">
+            <div class="row">
+                <div class="col-auto">
+                    <h3>Loss of Resilience</h3>
+                </div>
+                <div class="col">
+                    <div id="loss_viz"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add specification modal -->
+    <div class="modal fade" id="add-specification-modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add specification</h5>
+                    <button type="button" class="close" data-dismiss="modal" id="close-modal-bar-btn" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group row">
+                            <label for="initial-loss-input" class="col-sm-4 col-form-label">Initial loss:</label>
+                            <div class="col-sm-4">
+                                <input type="number" name="initial-loss" id="initial-loss-input" class="form-control" placeholder="e.g. 30" onchange="computeResilienceLoss()">
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="recovery-time-input" class="col-sm-4 col-form-label">Recovery time:</label>
+                            <div class="col-sm-4">
+                                <input type="number" name="recovery-time" id="recovery-time-input" class="form-control" placeholder="e.g. 120" onchange="computeResilienceLoss()">
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="resilience-loss" class="col-sm-4 col-form-label">Resilience loss:</label>
+                            <div class="col-sm-4">
+                                <input type="number" name="resilience-loss" id="resilience-loss-input" class="form-control" placeholder="e.g. 1800" readonly>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <div class="spinner-border act-ind" id="act-ind" role="status">
+                        <span class="sr-only">Loading ...</span>
+                    </div>                    
+                    <button type="button" class="btn btn-secondary" id="close-modal-btn" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="add-specification-btn" onclick="addSpecification()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialogflow messenger -->
+    <!-- You will have to change the agent-id to the id of your dialogflow agent -->
+    <df-messenger intent="WELCOME" chat-title="TransientBehaviorBot" agent-id="4322a878-c895-44cf-b75e-37cf0447d167"
+        language-code="en"></df-messenger>
+
+    <!-- Javascript -->
+    <script src="javascript/config.js"></script>
+    <script src="javascript/d3Service.js"></script>
+    <script src="javascript/networkService.js"></script>
+    <script src="javascript/main.js"></script>
+    <script src="javascript/socketService.js"></script>
+    <script src="javascript/modal.js"></script>
+
+    <!-- Bootstrap -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+        integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN"
+        crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+        integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV"
+        crossorigin="anonymous"></script>
+</body>
+
+</html>
